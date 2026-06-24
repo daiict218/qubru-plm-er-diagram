@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qubru PLM — Data Model Explorer</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1d2430; --muted:#6b7480; --line:#e3e7ee;
+    --doc:#7c5cff; --party:#16a36a; --life:#2f6bff; --claim:#e5484d; --comp:#e08600; --quote:#0aa5b8;
+    --shadow:0 1px 2px rgba(20,30,50,.06),0 4px 14px rgba(20,30,50,.05);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  header{padding:26px 34px 16px}
+  h1{margin:0;font-size:23px;letter-spacing:-.2px}
+  .sub{color:var(--muted);font-size:14px;margin-top:5px}
+  .bar{position:sticky;top:0;z-index:20;background:rgba(246,247,249,.92);backdrop-filter:blur(8px);
+       padding:12px 34px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .search{flex:1;min-width:220px;max-width:420px;position:relative}
+  .search input{width:100%;padding:10px 14px 10px 36px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff;outline:none}
+  .search input:focus{border-color:var(--life);box-shadow:0 0 0 3px rgba(47,107,255,.12)}
+  .search svg{position:absolute;left:11px;top:11px;color:var(--muted)}
+  .hint{color:var(--muted);font-size:13px}
+  .hint b{color:var(--ink)}
+  button.clear{background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 14px;font-size:13px;cursor:pointer;color:var(--ink)}
+  button.clear:hover{border-color:#c7cedb}
+  .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center;margin-left:auto}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  main{padding:22px 34px 70px;max-width:1280px;margin:0 auto}
+  .domain{margin-bottom:30px}
+  .domain h2{font-size:13px;text-transform:uppercase;letter-spacing:.9px;margin:0 0 12px;display:flex;align-items:center;gap:9px;color:var(--muted)}
+  .domain h2 .tag{width:13px;height:13px;border-radius:4px}
+  .domain h2 .cnt{font-weight:500;color:#aab1bd}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);overflow:hidden;
+        cursor:pointer;transition:opacity .18s ease, transform .12s ease, box-shadow .18s ease, border-color .18s}
+  .card:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(20,30,50,.10)}
+  .card .top{padding:12px 14px;border-top:3px solid var(--c);display:flex;align-items:center;justify-content:space-between}
+  .card .top b{font-size:15px;letter-spacing:-.2px}
+  .card .top .n{font-size:11px;color:var(--muted)}
+  .card .meaning{padding:0 14px 10px;font-size:12.5px;color:#5b6577;line-height:1.45;border-bottom:1px dashed #eef1f5;margin-bottom:6px}
+  .card .attrs{padding:6px 12px 12px;display:flex;flex-direction:column;gap:3px}
+  .attr{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:2px 0}
+  .attr .nm{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#33405a}
+  .attr .ty{color:#9aa3b2;font-size:11px;margin-left:auto;font-family:ui-monospace,monospace}
+  .chip{font-size:9.5px;font-weight:700;letter-spacing:.4px;padding:1px 5px;border-radius:5px;line-height:1.5}
+  .pk{background:#fff4d6;color:#9a6a00;border:1px solid #f1dca0}
+  .fk{background:#e7efff;color:#2f5fcc;border:1px solid #c8dbff}
+  /* selection states — opacity set inline per hop-distance; faded default below */
+  body.has-sel .card{opacity:.12}
+  .card.sel{outline:2px solid var(--c);outline-offset:1px}
+  /* depth control */
+  .depth{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 6px}
+  .depth .dlbl{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:0 4px}
+  .depth button{border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13px;padding:5px 11px;border-radius:7px;cursor:pointer}
+  .depth button:hover{background:#f1f3f7}
+  .depth button.don{background:var(--life);color:#fff}
+  /* relationship panel */
+  .rels{background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);margin-top:8px;overflow:hidden}
+  .rels .rh{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .rels .rh b{font-size:15px}
+  .rels .rh .who{color:var(--muted);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;padding:9px 18px;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--line)}
+  td{padding:10px 18px;border-bottom:1px solid #f0f2f6;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .ent{font-family:ui-monospace,monospace;font-weight:600;font-size:12.5px;padding:2px 7px;border-radius:6px;background:#f1f3f7;white-space:nowrap}
+  .verb{color:var(--muted);font-style:italic}
+  .arrow{color:#c0c6d2}
+  .badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px}
+  .b-doc{background:#efeaff;color:#6b46ff}
+  .b-inf{background:#f0f2f6;color:#8a93a3}
+  .b-nokey{background:#ffe2e4;color:#c0353c;cursor:help}
+  tr.dim{display:none}
+  .note{margin-top:22px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--doc);border-radius:11px;padding:15px 19px;font-size:13.5px;color:#4a5260;box-shadow:var(--shadow)}
+  .note b{color:var(--ink)}
+  code{background:#f1f3f7;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .sectlabel{font-size:13px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);margin:34px 0 10px}
+  /* open-question flags */
+  .top .topright{display:flex;align-items:center;gap:7px}
+  .warn{cursor:help;font-size:11px}
+  .warnchip{background:#fff4e5;border:1px solid #ffd6a0;color:#b56b00;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:7px;cursor:help}
+  .card.flagged{border-color:#ffd6a0}
+  #qpanel{background:#fff;border:1px solid var(--line);border-left:3px solid var(--comp);border-radius:13px;box-shadow:var(--shadow);padding:6px 4px 14px;margin-bottom:24px}
+  #qpanel .qhead{padding:14px 20px 6px;font-size:16px;font-weight:800}
+  #qpanel .qsub{padding:0 20px 10px;color:var(--muted);font-size:13px}
+  #qpanel .pr{padding:12px 20px;border-top:1px solid #f0f2f6}
+  #qpanel .pr b{display:block;font-size:13.5px;color:var(--comp);margin-bottom:7px}
+  #qpanel ul{margin:0;padding-left:20px}
+  #qpanel li{font-size:13.5px;margin:5px 0;color:#3a4250}
+  #qpanel li code{background:#f1f3f7;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  /* floating detail panel */
+  .detail{position:fixed;bottom:20px;width:330px;max-height:66vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 44px rgba(20,30,50,.24);z-index:60;animation:pop .2s both}
+  .detail-left{left:20px}
+  .detail-right{right:20px}
+  .detail .dt-kind{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:6px}
+  .detail-left .dt-kind{background:#e7efff;color:#2f5fcc}
+  .detail-right .dt-kind{background:#fff4e5;color:#b56b00}
+  @keyframes pop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .detail .dt-head{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;cursor:move;user-select:none;border-radius:14px 14px 0 0}
+  .detail .dt-name{font-weight:800;font-family:ui-monospace,monospace;font-size:14px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .detail .dt-actions{display:flex;gap:5px}
+  .detail.min{max-height:none}
+  .detail.min .dt-body{display:none}
+  .detail.min .dt-head{border-bottom:none;border-radius:14px}
+  .detail .dt-head button{border:none;background:#f1f3f7;border-radius:7px;width:27px;height:27px;cursor:pointer;color:var(--muted);font-size:13px}
+  .detail .dt-head button:hover{background:#e7eaf0}
+  .detail .dt-body{padding:4px 16px 16px}
+  .detail .dt-mean{font-size:13.5px;color:#3a4250;line-height:1.5;padding:12px 0 4px}
+  .detail .cnt{font-size:12px;color:var(--muted);padding:9px 0 4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-top:1px solid #f0f2f6;margin-top:6px}
+  .detail .ok{color:var(--party);font-size:14.5px;padding:14px 0;font-weight:600}
+  .detail .err{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #f0f2f6;font-size:13.5px;color:#3a4250;line-height:1.5}
+  .detail .err:last-child{border-bottom:none}
+  .detail .err .ic{font-size:15px;flex-shrink:0;line-height:1.4}
+  .detail .err b{font-family:ui-monospace,monospace;font-size:12px;color:#b56b00;display:block;margin-bottom:2px}
+  .detail .dt-sec{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin:14px 0 4px;border-top:1px solid #f0f2f6;padding-top:11px}
+  .detail .rel-row{padding:10px 0;border-bottom:1px solid #f6f7f9}
+  .detail .rel-row:last-of-type{border-bottom:none}
+  .detail .rel-top{display:flex;align-items:center;flex-wrap:wrap;gap:2px}
+  .detail .rdir{font-weight:800;color:var(--life);margin-right:6px;font-size:14px}
+  .detail .rverb{color:var(--muted);font-style:italic;font-size:11.5px;margin-left:7px}
+  .detail .rmean{color:#5b6577;font-size:12.5px;margin-top:4px;line-height:1.45}
+  .b-ok{background:#e7f6ee;color:#1c8a55}
+  .detail .dt-tabs{display:flex;gap:4px;margin:12px 0 2px;border-bottom:1px solid var(--line)}
+  .detail .dt-tabs button{flex:1;border:none;background:transparent;padding:10px 6px;font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .detail .dt-tabs button:hover{color:var(--ink)}
+  .detail .dt-tabs button.on{color:var(--ink);border-bottom-color:var(--life)}
+  .detail .dt-content{padding-top:6px}
+  .detail .empty{color:var(--muted);font-size:13px;padding:14px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Qubru PLM — Data Model Explorer</h1>
+  <div class="sub">6 domains · 27 entities · 14 documented relationships — from Architecture &amp; Data Model v1.0</div>
+</header>
+
+<div class="bar">
+  <div class="search">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="q" placeholder="Search an entity…" autocomplete="off">
+  </div>
+  <span class="hint" id="hint"><b>Tip:</b> click any card, then use <b>Depth</b> to trace the chain.</span>
+  <div class="depth" id="depthCtl">
+    <span class="dlbl">Depth</span>
+    <button data-d="1" class="don">1</button>
+    <button data-d="2">2</button>
+    <button data-d="3">3</button>
+    <button data-d="99">All</button>
+  </div>
+  <button class="clear" id="qbtn">⚠️ Open questions</button>
+  <button class="clear" id="clr" style="display:none">✕ Clear selection</button>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--doc)"></i>Documents</span>
+    <span><i class="dot" style="background:var(--party)"></i>Identity &amp; Party</span>
+    <span><i class="dot" style="background:var(--life)"></i>Policy Lifecycle</span>
+    <span><i class="dot" style="background:var(--claim)"></i>Claims</span>
+    <span><i class="dot" style="background:var(--comp)"></i>Compliance</span>
+    <span><i class="dot" style="background:var(--quote)"></i>Quote &amp; App</span>
+  </div>
+</div>
+
+<main>
+  <div id="qpanel" style="display:none">
+    <div class="qhead">⚠️ Open questions about this model</div>
+    <div class="qsub">Reviewed as a <b>relational database</b> (so every relationship must have a foreign key), and framed as "Don't Make Me Think" violations — each is a spot where the reader has to stop and guess. ⚠️ markers on the cards point to the exact field.</div>
+    <div class="pr"><b>1 · Get rid of question marks — every pointer should land somewhere obvious</b>
+      <ul>
+        <li><code>override_actor_id</code> points to a <b>ReviewActor that doesn't exist</b> as an entity.</li>
+        <li><code>producer_id</code>, <code>underwriter_id</code>, <code>actor_id</code>, <code>initiated_by</code> — <b>no Person/Actor entity</b> for any of them to point to.</li>
+        <li><code>paid_to_party_id</code> — is the payee the customer, or a repair shop / third party? No entity says.</li>
+      </ul></div>
+    <div class="pr"><b>2 · Don't make me guess the type</b>
+      <ul>
+        <li><code>resolves_to_node_id</code> lands on <b>3 different node types</b> — how is the target type known?</li>
+        <li><code>causal_trigger_event_id</code> is "PolicyTransaction <i>or</i> ClaimEvent" — which one?</li>
+        <li><code>:RECORDS</code> and <code>:CAUSAL_LINK</code> say "any node" — no constraint at all.</li>
+      </ul></div>
+    <div class="pr"><b>3 · A name should mean one thing</b>
+      <ul>
+        <li><code>coverage_id</code> is the PK on <b>both</b> PolicyCoverage and ClaimCoverage.</li>
+        <li><code>item_id</code> is the PK on <b>both</b> InsuredItem and ClaimItem.</li>
+      </ul></div>
+    <div class="pr"><b>4 · Don't make me hunt for the connection</b>
+      <ul>
+        <li><b>13 of the 27 entities have NO relationship at all in the document</b> — they stand completely alone. Flagged ⚠️ on the card header.</li>
+        <li>The document never says how a ClaimEvent reaches its items / coverages / payments — those relationships simply aren't written down.</li>
+      </ul></div>
+    <div class="pr"><b>5 · Show me the thing I actually came for</b>
+      <ul>
+        <li><b>Loss ratio can't be computed</b> — no exposure (vehicle-months), no earned_premium, no incurred total.</li>
+      </ul></div>
+    <div class="pr"><b>6 · Relationships with no linking key (relational view)</b>
+      <ul>
+        <li><b>6 of the 14 declared relationships have no foreign key</b> — so the two tables can't actually be joined. They're marked <span class="badge b-nokey">NO KEY</span> in the table below.</li>
+        <li>Example: <code>PolicyDocument</code> and <code>DocumentClassification</code> share <b>no ID</b> — nothing says which label belongs to which document.</li>
+        <li>Worst one: a <code>ClaimEvent</code> has <b>no <code>policy_id</code></b>, so a claim can't be tied to the policy it was filed under.</li>
+        <li>Inconsistent: some relationships DO carry a key (<code>resolves_to_node_id</code>, <code>rule_id</code>, <code>retention_schedule_id</code>) while these 6 carry nothing.</li>
+        <li><i>Source:</i> the relationships are the document's own (Section 4.2 "Core Edge Taxonomy") — but the entity tables don't carry the keys to implement them.</li>
+      </ul></div>
+  </div>
+  <div id="cards"></div>
+
+  <div class="sectlabel">Relationships</div>
+  <div class="rels">
+    <div class="rh"><b>Relationships</b> <span class="who" id="relwho">— the 14 relationships defined in the document (Section 4.2)</span></div>
+    <table>
+      <thead><tr><th>From</th><th>Relationship</th><th>To</th><th>What it means</th></tr></thead>
+      <tbody id="reltb"></tbody>
+    </table>
+  </div>
+
+  <div id="detailRels" class="detail detail-left" style="display:none">
+    <div class="dt-head"><span class="dt-name"></span><span class="dt-kind">🔗 Relationships</span>
+      <span class="dt-actions"><button class="dt-min" title="minimise">–</button><button class="dt-close" title="close">✕</button></span></div>
+    <div class="dt-body"></div>
+  </div>
+  <div id="detailProbs" class="detail detail-right" style="display:none">
+    <div class="dt-head"><span class="dt-name"></span><span class="dt-kind">⚠️ Problems</span>
+      <span class="dt-actions"><button class="dt-min" title="minimise">–</button><button class="dt-close" title="close">✕</button></span></div>
+    <div class="dt-body"></div>
+  </div>
+
+  <div class="note">
+    <b>Reading the relationships:</b> each row is <b>From · relationship · To</b>.
+    <span class="badge b-doc">DOC</span> = one of the 14 relationships formally defined in the document (Section 4.2). Every relationship shown here comes straight from the document — nothing is inferred or added.
+    <span class="badge b-nokey">NO KEY</span> = the relationship is declared but <b>no foreign key</b> joins the two tables — broken in a relational database.
+    Two edges are polymorphic (connect to <i>any</i> node): <code>:RECORDS</code> (audit trail) and <code>:CAUSAL_LINK</code> (typed cause→effect).
+    <code>PK</code> = primary key · <code>FK</code> = points to another entity.
+  </div>
+</main>
+
+<script>
+const C={doc:"var(--doc)",party:"var(--party)",life:"var(--life)",claim:"var(--claim)",comp:"var(--comp)",quote:"var(--quote)"};
+const DOMAINS=[
+  {key:"doc",  name:"Document Intelligence"},
+  {key:"party",name:"Identity & Party"},
+  {key:"life", name:"Policy Lifecycle"},
+  {key:"claim",name:"Claims"},
+  {key:"comp", name:"Compliance & Governance"},
+  {key:"quote",name:"Quote & Application"},
+];
+// entity: [name, domain, [ [attr,type,key] ... ]]
+const E=[
+ ["PolicyDocument","doc",[["document_id","uuid","pk"],["document_type_code","string"],["classification_confidence","float"],["lifecycle_stage","enum"],["source_system_id","string"],["source_format","enum"],["ingestion_timestamp","ts"],["effective_date","date"],["language_code","str"],["page_count","int"],["extraction_status","enum"],["retention_schedule_id","uuid","fk"],["audit_hash","sha256"],["causal_trigger_event_id","uuid","fk"]]],
+ ["DocumentClassification","doc",[["classification_id","uuid","pk"],["taxonomy_code","string"],["taxonomy_version","string"],["classifier_model","string"],["classifier_version","string"],["confidence_score","float"],["human_review_flag","bool"],["override_reason","string"],["override_actor_id","uuid","fk"],["classified_at","ts"]]],
+ ["DocumentEntity","doc",[["entity_id","uuid","pk"],["entity_type","enum"],["raw_value","string"],["normalized_value","string"],["extraction_confidence","float"],["page_reference","int"],["position_reference","json"],["resolves_to_node_id","uuid","fk"],["resolution_confidence","float"]]],
+ ["ExtractionRun","doc",[["run_id","uuid","pk"],["pipeline_version","string"],["model_version","string"],["started_at","ts"],["completed_at","ts"],["document_count","int"]]],
+
+ ["InsuredEntity","party",[["canonical_id","uuid","pk"],["entity_type","enum"],["tax_id_hash","hash"],["canonical_name","string"],["aliases","array"],["jurisdiction_code","str"],["active_since","date"]]],
+ ["PolicyContract","party",[["contract_id","uuid","pk"],["line_of_business","enum"],["inception_date","date"],["expiration_date","date"],["current_status","enum"],["originating_system","string"]]],
+ ["InsuredItem","party",[["item_id","uuid","pk"],["item_type","enum"],["identifier","string"],["description","string"],["risk_class","string"]]],
+ ["PartyRoleAssignment","party",[["role_id","uuid","pk"],["role_type","enum"],["effective_from","date"],["effective_to","date"],["source_system","string"]]],
+
+ ["QuoteContext","life",[["quote_id","uuid","pk"],["quoted_premium","money"],["effective_date","date"],["producer_id","uuid","fk"],["risk_signals","array"]]],
+ ["UnderwritingDecision","life",[["decision_id","uuid","pk"],["decision_type","enum"],["decision_date","date"],["underwriter_id","uuid","fk"],["rationale_summary","string"]]],
+ ["PolicyTransaction","life",[["transaction_id","uuid","pk"],["transaction_type","enum"],["effective_date","date"],["posted_date","date"],["premium_impact","money"],["parent_transaction_id","uuid","fk"]]],
+ ["TemporalSnapshot","life",[["snapshot_id","uuid","pk"],["snapshot_date","date"],["trigger_transaction_id","uuid","fk"],["state_hash","hash"]]],
+ ["PolicyCoverage","life",[["coverage_id","uuid","pk"],["coverage_type","enum"],["limit_amount","money"],["deductible_amount","money"],["effective_from","date"],["effective_to","date"]]],
+ ["PolicySurcharge","life",[["surcharge_id","uuid","pk"],["surcharge_type","enum"],["amount","money"],["reason_code","string"],["applicable_to","string"]]],
+
+ ["ClaimEvent","claim",[["claim_id","uuid","pk"],["claim_number","string"],["loss_date","date"],["report_date","date"],["claim_type","enum"],["loss_type","enum"],["estimated_amount","money"],["status","enum"]]],
+ ["ClaimItem","claim",[["item_id","uuid","pk"],["description","string"],["category","string"],["claimed_amount","money"]]],
+ ["ClaimCoverage","claim",[["coverage_id","uuid","pk"],["status","enum"],["loss_reserve","money"],["expense_reserve","money"]]],
+ ["ClaimPayment","claim",[["payment_id","uuid","pk"],["payment_type","enum"],["status","enum"],["claimed_amount","money"],["adjusted_amount","money"],["paid_to_party_id","uuid","fk"]]],
+ ["ClaimReserve","claim",[["reserve_id","uuid","pk"],["reserve_type","enum"],["amount","money"],["status","enum"]]],
+
+ ["JurisdictionProfile","comp",[["jurisdiction_code","str","pk"],["country_code","str"],["regulator_name","string"],["regulatory_framework","string"],["framework_citation","string"],["active","bool"]]],
+ ["RetentionRule","comp",[["rule_id","uuid","pk"],["jurisdiction_code","str","fk"],["line_of_business","enum"],["document_type_code","string"],["trigger_event_type","enum"],["retention_days","int"],["legal_basis","string"],["effective_from","date"],["effective_to","date"]]],
+ ["RetentionSchedule","comp",[["schedule_id","uuid","pk"],["document_id","uuid","fk"],["rule_id","uuid","fk"],["created_date","date"],["scheduled_destruction_date","date"],["on_hold","bool"],["hold_reason","string"],["last_reviewed","date"]]],
+ ["AuditEvent","comp",[["event_id","uuid","pk"],["event_type","enum"],["actor_id","uuid","fk"],["actor_role","string"],["timestamp","ts"],["target_node_id","uuid","fk"],["target_node_type","string"],["previous_state_hash","hash"],["new_state_hash","hash"],["session_id","uuid"]]],
+ ["LegalHold","comp",[["hold_id","uuid","pk"],["initiated_by","uuid","fk"],["initiated_date","date"],["reason","string"],["scope_query","string"],["active","bool"]]],
+
+ ["InsuranceApplication","quote",[["application_id","uuid","pk"],["submission_date","date"],["status","enum"],["language","str"],["form_version","string"]]],
+ ["QuotedCoverage","quote",[["quoted_coverage_id","uuid","pk"],["coverage_type","enum"],["quoted_limit","money"],["quoted_premium","money"],["rate_basis","string"]]],
+ ["PricingAdjustment","quote",[["adjustment_id","uuid","pk"],["adjustment_type","enum"],["amount","money"],["reason_code","string"]]],
+];
+// relationship: [from, verb, to, meaning, type]  type: "doc" | "inf"
+const R=[
+ ["PolicyContract","HAS_DOCUMENT","PolicyDocument","A policy keeps all its paperwork together. E.g. the 38-truck policy holds its dec page, inspections and invoices.","doc"],
+ ["PolicyDocument","CLASSIFIED_AS","DocumentClassification","Each document gets a type label. E.g. this PDF is tagged 'inspection report'.","doc"],
+ ["PolicyDocument","CONTAINS_ENTITY","DocumentEntity","Facts are pulled out of a document. E.g. the inspection gives us the truck's VIN and the driver's name.","doc"],
+ ["DocumentEntity","RESOLVES_TO","InsuredEntity","A name on paper is matched to the real customer. E.g. 'Andes Trucking' on the form = the customer Andes Trucking S.A.","doc"],
+ ["DocumentEntity","RESOLVES_TO","PolicyContract","A policy number on paper is matched to the actual policy. E.g. 'POL-1234' = the 38-truck policy.","doc"],
+ ["DocumentEntity","RESOLVES_TO","ClaimEvent","A claim number on paper is matched to the actual claim. E.g. 'CLM-99' = the May 5 crash.","doc"],
+ ["PolicyTransaction","TRIGGERED_DOCUMENT","PolicyDocument","A policy change creates paperwork. E.g. adding a truck generates an endorsement document.","doc"],
+ ["ClaimEvent","TRIGGERED_DOCUMENT","PolicyDocument","A claim creates paperwork. E.g. the crash generates the first-notice report and the adjuster's report.","doc"],
+ ["PolicyContract","HAS_VERSION","TemporalSnapshot","We can see the policy as it was on any past date. E.g. 'show the policy exactly as it stood on Jan 1'.","doc"],
+ ["PolicyTransaction","AMENDED_BY","PolicyTransaction","A later change corrects an earlier one. E.g. the March endorsement was fixed by an April correction.","doc"],
+ ["ClaimEvent","FILED_UNDER","PolicyContract","A claim is made against a specific policy. E.g. the May 5 crash is filed under the fleet policy.","doc"],
+ ["ClaimCoverage","CLAIMS_AGAINST","PolicyCoverage","The claim draws money from a specific protection. E.g. the crash is paid out of the policy's Collision coverage.","doc"],
+ ["PolicyDocument","SUBJECT_TO","RetentionSchedule","Each document gets a keep-until date. E.g. this claim form must be kept until 2034.","doc"],
+ ["RetentionSchedule","GOVERNED_BY","RetentionRule","The keep-until date comes from a legal rule. E.g. the 'keep 10 years' rule sets the 2034 date.","doc"],
+ ["RetentionRule","APPLIES_IN","JurisdictionProfile","The rule belongs to a country. E.g. the 10-year rule applies in Colombia.","doc"],
+ ["AuditEvent","RECORDS","(any node)","Every action on anything is logged forever. E.g. 'Maria opened the claim file at 3pm' is recorded.","doc"],
+ ["(any node)","CAUSAL_LINK","(any node)","One thing led to another, tracked as cause → effect. E.g. 'the risky route caused the repeated crashes'.","doc"],
+];
+
+// build adjacency
+const adj={}; E.forEach(e=>adj[e[0]]=new Set());
+R.forEach(([f,,t])=>{ if(adj[f])adj[f].add(t); if(adj[t])adj[t].add(f); });
+
+// open-question flags
+const FIELD_Q={
+ "DocumentClassification.override_actor_id":"Points to a 'ReviewActor' that doesn't exist as an entity.",
+ "QuoteContext.producer_id":"No Person/Actor entity for this to point to.",
+ "UnderwritingDecision.underwriter_id":"No Person/Actor entity for this to point to.",
+ "AuditEvent.actor_id":"No Person/Actor entity for this to point to.",
+ "LegalHold.initiated_by":"No Person/Actor entity for this to point to.",
+ "ClaimPayment.paid_to_party_id":"Payee may be a non-customer (repair shop) — which entity?",
+ "DocumentEntity.resolves_to_node_id":"Resolves to 3 different node types — how is the type known?",
+ "PolicyDocument.causal_trigger_event_id":"PolicyTransaction OR ClaimEvent — which one?",
+ "AuditEvent.target_node_id":"Any node — no type constraint.",
+ "PolicyCoverage.coverage_id":"PK name 'coverage_id' is reused on ClaimCoverage.",
+ "ClaimCoverage.coverage_id":"PK name 'coverage_id' is reused on PolicyCoverage.",
+ "InsuredItem.item_id":"PK name 'item_id' is reused on ClaimItem.",
+ "ClaimItem.item_id":"PK name 'item_id' is reused on InsuredItem.",
+};
+const NO_DOC_EDGE=new Set();
+(function(){const ends=new Set();R.forEach(([f,,t,,ty])=>{if(ty==="doc"){ends.add(f);ends.add(t);}});E.forEach(e=>{if(!ends.has(e[0]))NO_DOC_EDGE.add(e[0]);});})();
+// reviewing as a RELATIONAL database: a relationship must be backed by a foreign key.
+// these 6 documented relationships have no key on either table. A broken link is a
+// problem on BOTH entities it touches — so both the parent and the child report it.
+const NO_KEY_RELS=[
+ {from:"PolicyContract",verb:"HAS_DOCUMENT",to:"PolicyDocument",carrier:"PolicyDocument",fk:"contract_id"},
+ {from:"PolicyDocument",verb:"CLASSIFIED_AS",to:"DocumentClassification",carrier:"DocumentClassification",fk:"document_id"},
+ {from:"PolicyDocument",verb:"CONTAINS_ENTITY",to:"DocumentEntity",carrier:"DocumentEntity",fk:"document_id"},
+ {from:"PolicyContract",verb:"HAS_VERSION",to:"TemporalSnapshot",carrier:"TemporalSnapshot",fk:"contract_id"},
+ {from:"ClaimEvent",verb:"FILED_UNDER",to:"PolicyContract",carrier:"ClaimEvent",fk:"policy_id"},
+ {from:"ClaimCoverage",verb:"CLAIMS_AGAINST",to:"PolicyCoverage",carrier:"ClaimCoverage",fk:"policy_coverage_id"},
+];
+const NO_KEY=new Set(NO_KEY_RELS.map(r=>r.from+"|"+r.verb+"|"+r.to));
+function missingKeyIssues(name){
+  return NO_KEY_RELS.filter(r=>r.from===name||r.to===name).map(r=>{
+    const partner=r.from===name?r.to:r.from;
+    return {field:"missing link key", text:`The "${r.verb}" link with ${partner} is declared, but no foreign key joins the two tables — ${r.carrier} needs a '${r.fk}' field.`};
+  });
+}
+// plain-language version of each problem, shown in the click panel
+const PLAIN={
+ "DocumentClassification.override_actor_id":"This is supposed to record which person corrected the document's label. But there's no 'Person' box anywhere in the model, so we can't actually say who did it.",
+ "QuoteContext.producer_id":"This should say which broker or agent gave the quote. But there's no 'Person' box to link them to — so the broker has nowhere to live.",
+ "UnderwritingDecision.underwriter_id":"This should say which underwriter made the accept/decline decision. But there's no 'Person' box, so the underwriter can't be linked.",
+ "AuditEvent.actor_id":"This should say who did the action (viewed, changed, deleted). But there's no 'Person' box, so we can't say who it was.",
+ "LegalHold.initiated_by":"This should say who started the legal freeze. But there's no 'Person' box, so the starter can't be recorded.",
+ "ClaimPayment.paid_to_party_id":"This should say who received the payout. Often that's a repair shop or another company, not the customer — but there's no box for those, so it's unclear who got paid.",
+ "DocumentEntity.resolves_to_node_id":"This links a fact to the real thing it's about — but that could be a customer, a policy, OR a claim. The field doesn't say which kind, so you can't tell what it's pointing at.",
+ "PolicyDocument.causal_trigger_event_id":"This is meant to say what caused this document to be created. It could be a change to the policy, or a claim — but the field doesn't say which. So you can't tell if a crash or a policy edit produced it.",
+ "AuditEvent.target_node_id":"This points to whatever the action was about — but it can point to literally anything, with no rules. So nothing stops it pointing to the wrong kind of thing.",
+ "PolicyCoverage.coverage_id":"Two different boxes both name their ID 'coverage_id'. Easy to mix up a policy's coverage with a claim's coverage.",
+ "ClaimCoverage.coverage_id":"Two different boxes both name their ID 'coverage_id'. Easy to mix up a claim's coverage with a policy's coverage.",
+ "InsuredItem.item_id":"Two different boxes both name their ID 'item_id'. Easy to mix up an insured thing (a truck) with a claim line-item (a damaged bumper).",
+ "ClaimItem.item_id":"Two different boxes both name their ID 'item_id'. Easy to mix up a claim line-item (a damaged bumper) with an insured thing (a truck).",
+};
+function entityErrors(name){
+  const out=[]; const ent=E.find(e=>e[0]===name);
+  if(ent)ent[2].forEach(a=>{const p=PLAIN[name+"."+a[0]];if(p)out.push({field:a[0],text:p});});
+  out.push(...missingKeyIssues(name));
+  if(NO_DOC_EDGE.has(name))out.push({field:"no relationship",text:"The document defines no relationship for this entity (Section 4.2 lists none). It stands completely alone in the model."});
+  return out;
+}
+function entityRels(name){
+  return R.filter(r=>r[0]===name||r[2]===name).map(r=>{
+    const out=r[0]===name, partner=out?r[2]:r[0];
+    const nk=NO_KEY_RELS.find(x=>x.from===r[0]&&x.verb===r[1]&&x.to===r[2]);
+    return {dir:out?"→":"←", verb:r[1], partner, meaning:r[3], nk};
+  });
+}
+function showDetail(name){
+  const rels=entityRels(name);
+  const fieldErrs=[]; const ent=E.find(e=>e[0]===name);
+  if(ent)ent[2].forEach(a=>{const p=PLAIN[name+"."+a[0]];if(p)fieldErrs.push({field:a[0],text:p});});
+  const orphan=rels.length===0;
+
+  // LEFT panel — relationships only
+  const relsBody = rels.length
+    ? rels.map(r=>`<div class="rel-row"><div class="rel-top"><span class="rdir">${r.dir}</span><span class="ent">${r.partner}</span><span class="rverb">${r.verb}</span>${r.nk?`<span class="badge b-nokey">NO KEY</span>`:`<span class="badge b-ok">OK</span>`}</div><div class="rmean">${r.meaning}</div></div>`).join("")
+    : `<div class="empty">The document doesn't connect this entity to anything.</div>`;
+
+  // RIGHT panel — problems only
+  const probItems=[];
+  rels.filter(r=>r.nk).forEach(r=>probItems.push({field:"missing link key",text:`The "${r.verb}" link with ${r.partner} has no foreign key — ${r.nk.carrier} needs a '${r.nk.fk}' field, or the two tables can't be joined.`}));
+  fieldErrs.forEach(e=>probItems.push(e));
+  if(orphan)probItems.push({field:"no relationship",text:"The document defines no relationship for this entity (Section 4.2 lists none). It stands completely alone in the model."});
+  const probBody = probItems.length
+    ? probItems.map(e=>`<div class="err"><span class="ic">⚠️</span><div><b>${e.field}</b>${e.text}</div></div>`).join("")
+    : `<div class="ok">✅ No problems found on this entity.</div>`;
+
+  const pr=document.getElementById("detailRels");
+  pr.querySelector(".dt-name").textContent=name;
+  pr.querySelector(".dt-body").innerHTML=`<div class="dt-mean">${MEANING[name]||""}</div><div class="cnt">${rels.length} relationship${rels.length!==1?"s":""}</div>${relsBody}`;
+  const pp=document.getElementById("detailProbs");
+  pp.querySelector(".dt-name").textContent=name;
+  pp.querySelector(".dt-body").innerHTML=`<div class="cnt">${probItems.length} problem${probItems.length!==1?"s":""}</div>${probBody}`;
+  pr.style.display=""; pp.style.display="";
+}
+
+// what each entity means in plain INSURANCE terms, with a real example
+const MEANING={
+ PolicyDocument:"Any document in an insurance file — an application, a declarations page, an inspection report, an invoice, a claim form. E.g. the PDF inspection report for a truck.",
+ DocumentClassification:"The label saying which type of insurance document this is, so it can be sorted. E.g. “this is a Declarations Page” vs a claim form.",
+ DocumentEntity:"A single fact taken from a document — the insured's name, a vehicle VIN, a coverage limit, a premium amount. E.g. “$50,000 liability limit”.",
+ ExtractionRun:"A log of one round of reading documents and pulling facts out — used for audit. E.g. “processed 200 claim files on June 1”.",
+ InsuredEntity:"The policyholder — the person or business that is insured. E.g. “Andes Trucking S.A.”, the company that buys the fleet policy.",
+ PolicyContract:"The insurance policy itself — the legal contract between insurer and insured. E.g. a 12-month commercial-auto policy covering 38 trucks.",
+ InsuredItem:"The specific thing the policy covers. In commercial auto it's a vehicle; in property it's a building. E.g. one truck on the fleet policy.",
+ PartyRoleAssignment:"Who plays what role on a policy or claim — named insured, broker, adjuster, driver. The same person can have different roles. E.g. “Maria is the adjuster on this claim”.",
+ QuoteContext:"Everything known about the risk when the price was quoted — what the premium was based on. E.g. “quoted $30k/yr: 38 trucks, 5 yrs no claims”.",
+ UnderwritingDecision:"The insurer's call to accept, decline, or accept-with-conditions, and why. E.g. “accepted, but $2,500 deductible because of the mountain route”.",
+ PolicyTransaction:"Any change to a policy during its life — add a vehicle, renew, cancel, mid-term endorsement. E.g. “added truck #39 in March, +$800 premium”.",
+ TemporalSnapshot:"What the policy looked like on a specific past date — answers “what was covered back then?”. E.g. “as of Jan 1: 38 trucks, these limits”.",
+ PolicyCoverage:"One type of protection inside the policy, with its limit and deductible. A policy has several. E.g. “Collision: $100k limit, $2,500 deductible”.",
+ PolicySurcharge:"An extra amount added to the premium for higher risk. E.g. “+$200 for operating on a high-accident route”.",
+ ClaimEvent:"A reported loss the insured is claiming for — accident, theft, damage. E.g. “truck crashed on Ruta 50 on May 5”.",
+ ClaimItem:"One piece of the loss within a claim; one accident can have several. E.g. “damaged bumper” and “driver injury” on the same crash.",
+ ClaimCoverage:"Which policy protection is being used to pay a claim, and its status. E.g. “paying this crash under the Collision coverage”.",
+ ClaimPayment:"An actual payout on a claim, and who received it. E.g. “paid $8,000 to the repair shop”.",
+ ClaimReserve:"Money the insurer sets aside to cover a claim's expected cost before it's fully paid. E.g. “reserve $40,000 for this total-loss claim”.",
+ JurisdictionProfile:"A country/region with its insurance regulator and rules. E.g. “Colombia, regulator SFC, framework Decreto 2555”.",
+ RetentionRule:"A legal rule for how long a type of document must be kept before deletion. E.g. “claim files: keep 10 years in Colombia”.",
+ RetentionSchedule:"The keep-until date on one specific document, set by the rule. E.g. “this claim form can be destroyed on Jan 1, 2034”.",
+ AuditEvent:"A permanent, unchangeable record of every action — who viewed, changed, or deleted what, and when. Regulators require it. E.g. “Maria viewed this file June 24, 3pm”.",
+ LegalHold:"A freeze that stops documents being deleted (lawsuit or regulator exam), even if their retention timer expired. E.g. “freeze all Andes Trucking files”.",
+ InsuranceApplication:"The form a customer or broker submits to request insurance, with all the risk details. E.g. “Andes Trucking's application listing 38 trucks”.",
+ QuotedCoverage:"A specific protection offered in a quote, with its proposed limit and price — before the policy is bought. E.g. “Collision quoted at $1,200/yr, $100k limit”.",
+ PricingAdjustment:"A discount or extra applied while pricing a quote. E.g. “10% discount for a clean 5-year claims record”.",
+};
+
+// render cards
+const cardsEl=document.getElementById("cards");
+DOMAINS.forEach(d=>{
+  const ents=E.filter(e=>e[1]===d.key);
+  const sec=document.createElement("div"); sec.className="domain";
+  sec.innerHTML=`<h2><span class="tag" style="background:${C[d.key]}"></span>${d.name}<span class="cnt">· ${ents.length}</span></h2>`;
+  const g=document.createElement("div"); g.className="grid";
+  ents.forEach(([name,dom,attrs])=>{
+    const c=document.createElement("div"); c.className="card"; c.dataset.name=name;
+    c.style.setProperty("--c",C[dom]);
+    let fieldIssues=0;
+    const rows=attrs.map(a=>{
+      const chip=a[2]==="pk"?`<span class="chip pk">PK</span>`:a[2]==="fk"?`<span class="chip fk">FK</span>`:"";
+      const q=FIELD_Q[name+"."+a[0]];
+      const warn=q?(fieldIssues++,`<span class="warn" title="${q}">⚠️</span>`):"";
+      return `<div class="attr"><span class="nm">${a[0]}</span>${chip}${warn}<span class="ty">${a[1]}</span></div>`;
+    }).join("");
+    const noEdge=NO_DOC_EDGE.has(name);
+    const mfk=missingKeyIssues(name).length;
+    const cnt=fieldIssues+mfk+(noEdge?1:0);
+    const tip=(noEdge?"No documented edge — only inferred. ":"")+(mfk?mfk+" missing link key(s). ":"")+(fieldIssues?fieldIssues+" field question(s).":"");
+    const wchip=cnt?`<span class="warnchip" title="${tip}">⚠️ ${cnt}</span>`:"";
+    if(cnt)c.classList.add("flagged");
+    c.innerHTML=`<div class="top"><b>${name}</b><span class="topright">${wchip}<span class="n">${attrs.length} fields</span></span></div><div class="meaning">${MEANING[name]||""}</div><div class="attrs">${rows}</div>`;
+    c.onclick=()=>select(name);
+    g.appendChild(c);
+  });
+  sec.appendChild(g); cardsEl.appendChild(sec);
+});
+
+// render relationships
+const reltb=document.getElementById("reltb");
+function entHtml(n){return n.startsWith("(")?`<span class="ent" style="background:#fff;border:1px dashed #c7cedb;color:#8a93a3">${n}</span>`:`<span class="ent">${n}</span>`;}
+R.forEach(([f,v,t,m,ty])=>{
+  const tr=document.createElement("tr");
+  tr.dataset.f=f; tr.dataset.t=t;
+  const badge=ty==="doc"?`<span class="badge b-doc">DOC</span>`:`<span class="badge b-inf">INFERRED</span>`;
+  const nokey=NO_KEY.has(f+"|"+v+"|"+t)?`<span class="badge b-nokey" title="No foreign key joins these two tables — broken in a relational DB.">NO KEY</span>`:"";
+  tr.innerHTML=`<td>${entHtml(f)}</td><td><span class="verb">${v}</span>${badge}${nokey}</td><td><span class="arrow">→</span> ${entHtml(t)}</td><td>${m}</td>`;
+  reltb.appendChild(tr);
+});
+
+// selection with hop-distance (BFS) + graded fade
+let sel=null, depth=1;
+function bfs(start,maxD){
+  const dist={[start]:0}; let frontier=[start];
+  for(let d=1; d<=maxD; d++){
+    const next=[];
+    frontier.forEach(n=>{(adj[n]||new Set()).forEach(m=>{ if(!(m in dist)){dist[m]=d; next.push(m);} });});
+    frontier=next; if(!frontier.length)break;
+  }
+  return dist;
+}
+function op(d){ return d<=1?1 : d===2?0.6 : d===3?0.42 : 0.3; }   // brightness by hop distance
+function applySel(){
+  if(!sel){clearVisual();return;}
+  const dist=bfs(sel, depth);
+  const vis=new Set(Object.keys(dist));
+  document.body.classList.add("has-sel");
+  document.getElementById("clr").style.display="";
+  document.querySelectorAll(".card").forEach(c=>{
+    const n=c.dataset.name;
+    c.style.opacity = (n in dist) ? op(dist[n]) : "";   // "" falls back to faded .12
+    c.classList.toggle("sel", n===sel);
+  });
+  let cnt=0;
+  document.querySelectorAll("#reltb tr").forEach(tr=>{
+    const show = vis.has(tr.dataset.f) && vis.has(tr.dataset.t);
+    tr.classList.toggle("dim",!show); if(show)cnt++;
+  });
+  const dtxt = depth>=99?"all hops":(depth+" hop"+(depth>1?"s":""));
+  document.getElementById("relwho").textContent=`— ${sel} · within ${dtxt} · ${cnt} link${cnt!==1?"s":""}`;
+  document.getElementById("hint").innerHTML=`Showing <b>${sel}</b> + connections within <b>${dtxt}</b>.`;
+  showDetail(sel);
+}
+function select(name){ if(sel===name){clearSel();return;} sel=name; applySel(); }
+function clearSel(){ sel=null; clearVisual(); }
+function clearVisual(){
+  document.body.classList.remove("has-sel");
+  document.getElementById("clr").style.display="none";
+  document.querySelectorAll(".card").forEach(c=>{c.classList.remove("sel");c.style.opacity="";});
+  document.querySelectorAll("#reltb tr").forEach(tr=>tr.classList.remove("dim"));
+  document.getElementById("relwho").textContent="— the 14 relationships defined in the document (Section 4.2)";
+  document.getElementById("hint").innerHTML="<b>Tip:</b> click any card, then use <b>Depth</b> to trace the chain.";
+  document.getElementById("detailRels").style.display="none";
+  document.getElementById("detailProbs").style.display="none";
+}
+document.getElementById("clr").onclick=clearSel;
+document.getElementById("qbtn").onclick=()=>{
+  const p=document.getElementById("qpanel"), b=document.getElementById("qbtn");
+  const show=p.style.display==="none";
+  p.style.display=show?"":"none";
+  b.textContent=show?"✕ Hide questions":"⚠️ Open questions";
+  if(show)p.scrollIntoView({behavior:"smooth",block:"nearest"});
+};
+document.querySelectorAll("#depthCtl button").forEach(b=>{
+  b.onclick=()=>{
+    depth=+b.dataset.d;
+    document.querySelectorAll("#depthCtl button").forEach(x=>x.classList.toggle("don",x===b));
+    if(sel)applySel();
+  };
+});
+
+// minimise + close + drag for the two floating panels
+function setupPanel(id){
+  const p=document.getElementById(id), head=p.querySelector(".dt-head");
+  p.querySelector(".dt-min").onclick=e=>{e.stopPropagation();const m=p.classList.toggle("min");const b=e.currentTarget;b.textContent=m?"▢":"–";b.title=m?"expand":"minimise";};
+  p.querySelector(".dt-close").onclick=e=>{e.stopPropagation();clearSel();};
+  let dx=0,dy=0,drag=false;
+  head.addEventListener("mousedown",e=>{
+    if(e.target.closest("button"))return;
+    drag=true; const r=p.getBoundingClientRect();
+    dx=e.clientX-r.left; dy=e.clientY-r.top;
+    p.style.left=r.left+"px"; p.style.top=r.top+"px"; p.style.right="auto"; p.style.bottom="auto";
+    document.body.style.userSelect="none";
+  });
+  window.addEventListener("mousemove",e=>{ if(!drag)return;
+    p.style.left=Math.max(0,Math.min(window.innerWidth-60,e.clientX-dx))+"px";
+    p.style.top=Math.max(0,Math.min(window.innerHeight-30,e.clientY-dy))+"px";
+  });
+  window.addEventListener("mouseup",()=>{ if(drag){drag=false;document.body.style.userSelect="";} });
+}
+setupPanel("detailRels"); setupPanel("detailProbs");
+
+// search
+document.getElementById("q").addEventListener("input",e=>{
+  const q=e.target.value.trim().toLowerCase();
+  document.querySelectorAll(".card").forEach(c=>{
+    const show=!q||c.dataset.name.toLowerCase().includes(q);
+    c.style.display=show?"":"none";
+  });
+});
+</script>
+</body>
+</html>
